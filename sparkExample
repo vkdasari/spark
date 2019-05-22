@@ -1,0 +1,218 @@
+============================================================
+Spark
+
+Creation of RDDs:
+way1: parallelize
+
+Way2 --> read data with sc
+hadoop fs -ls
+hadoop fs -mkdir sparklab
+gedit comment --> create some text in the file "comment"
+hadoop fs -copyFromLocal comment sparklab
+hadoop fs -ls sparklab  
+hadoop fs -ls /user/cloudera/sparklab
+
+val data = sc.textFile("/user/cloudera/sparklab")
+data.collect
+data.foreach(println)
+
+
+Way3
+val lens = data.map(x => x.length)
+lens.collect
+
+val words = data.map(x => x.split(" "))
+words.collect
+
+
+val l1 = List(10,20,30,40,50,60,70,80,90)
+val lx = l1.map(x => x+10)
+val ll = sc.parallelize(lx)
+
+
+==========================
+filter is also transnformation
+
+
+val l1 = List(10,20,30,40,50,60,70,80,90)
+val l2 = sc.parallelize(l1)
+val x = l1.collect
+
+when action is perfomed, RDD will not be created,
+Transformation or filter RDD will be created
+
+val sales = sc.paralellize(List(List(10,20,30),List(30,40,50,10),List(1,2,3,4))) --> RDD
+sales.collect --> copies data to local object
+
+val s = sales.flatMap(x => x) --> RDD
+s.collect
+val s = sales.flatMap(x => x).sum --> local obj, due to action sum
+
+
+
+val data = sc.textFile("/user/cloudera/sparklab")
+data.collect
+data.foreach(println)
+
+val words = data.flatMap(x => x.split(" "))
+words.collect
+words.foreach(println)
+
+val pair = words.map(x=> (x,1))
+pair.collect
+
+val res = pair.reduceByKey((a,b) => a+b)
+res.collect
+
+res.saveAsTextFile("/user/cloudera/sparklab/res1")
+
+hadoop fs -ls sparklab/res1
+hadoop fs -cat sparklab/res1/part-00000
+
+
+transformation of results  (are,1) --> are   1
+res.collect 
+val r = res.map( x => x._1+"\t"+x._2)
+r.foreach(println)
+r.saveAsTextFile("/user/cloudera/sparklab/res2")
+hadoop fs -cat sparklab/res2/part-00000
+
+
+val names = sc.parallelize(List("vamsi","dAsari","swaRna","LakShMI"))
+val nn = names.map{ n =>
+	val fc = n.substring(0,1).toUpperCase()
+	val rc = n.substring(1).toLowerCase()
+	fc+rc
+}
+
+nn.collect
+
+def upper(x:String) = x.toUpperCase()
+upper("vamsi")
+VAMSI
+
+names.collect
+val nm = names.map(x => upper(x))
+nm.collect 
+
+def fUpper(x:String) = {
+	val fc = x.substring(0,1).toUperCase()
+	val rc = x.substring(1).toLowerCase()
+	fc+rc
+}
+
+val nn = names.map(x => fUpper(x))
+
+hdfs file
+profiles
+101,amar,2000,m,11
+102,rani,3000,f,12
+103,raja,5000,m,11
+104,pinky,4000,f,11
+
+hdoop fs -copyFromLocal profiles sparklab
+val prof = sc.textFile("/user/cloudera/sparklab/profiles")
+prof.count
+prof.foreach(println)
+//select sum(sal) from emp
+val words = prof.map(x => x.split(",")(2)toInt)
+words.collect
+words.sum
+
+//select sex,sum(sal) from emp group by sex;
+//select sex,max(sal) from emp group by sex;
+
+way1:
+val pair = prof.map{ x=>
+	val w = x.split(",")
+	val sex = w(3)
+	val sal w(4).toInt
+	(sex,sal)
+	}
+	
+pair.foreach(println)
+	
+way2:
+val w = prof.map(x => x.split(","))
+val pair = w.map(x => (x(3),x(2).toInt))
+pair.foreach(println)
+
+w.persist
+//select dno, sex,sum(sal) from emp group by dno sex;
+val dss = w.map{ x=>
+	val dno = x(4)
+	val sex = x(3)
+	val sal = x(2).toInt
+	val key = (dno,sex)
+	(key,sal)
+}
+	
+	
+profiles
+101,amar,2000,m,11
+102,rani,3000,f,12
+103,raja,5000,m,11
+104,pinky,4000,f,11
+105,amar,2000,m,11
+106,rani,3000,f,12
+107,raja,5000,m,11
+108,pinky,4000,f,11
+
+hadoop fs -copyFromLocal profiles sparklab/emp
+def fUpper(x:String) = {
+	val fc = x.substring(0,1).toUperCase()
+	val rc = x.substring(1).toLowerCase()
+	fc+rc
+}
+
+def dept(d:Int) = {
+	val dname = d match{
+		case ll => "Marketing"
+		case 12 => "HR"
+		case 12 => "Finance"
+		case _  => "Others"
+	}
+	dname
+}
+
+def salCoeff(s:Int) ={
+	val tax = s *10/100
+	val hra = s *20/100
+	val net = s + hra - tax
+	(tax,hra,net)
+}
+
+def grade(sal:Int) ={
+	var g = "D"
+	if(sal >7000)
+	 g="A"
+	else if (sal >= 5000)
+     g="B"
+    else if (sal >=3000)
+     g="C"	
+	
+	g
+}
+
+def gend(x: String) = {
+	if (x == "M") "Male" else "Female"
+}
+
+def transform(line: String) = { 
+	val w = line.split(",")
+	val id = w(0)
+	val name = fUpper(w(1))
+	val sal = w(2).toInt
+	val coeff = salCoeff(sal)
+	val grd = grade(sal)
+	val sex = gend(w(3))
+	val dname = dept(w(4).toInt)
+	//id+","+name+","+sal+","+c._1+","+c._2+","+c._3+","+grd+","+sex+","+dname
+	val l = List(id,name,sal.toString,c._1.toString,c._2.toString,c._3.toString,grd,sex,dname)
+	l.mkString(",")
+}
+
+val emp = sc.textFile("/user/cloudera/sparklab/emp")
+val newemp = emp.map(x => transform(x))
+newemp.saveAsTestFile("/user/cloudera/sparklab/emp/transfomed")
+=========================================================================
